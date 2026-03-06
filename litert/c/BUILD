@@ -532,6 +532,7 @@ cc_test(
 #         "@ml_drift//ml_drift/syrtis:environment",
 #         "@ml_drift//ml_drift/syrtis:vulkan_wrapper",
 #         "@ml_drift//ml_drift/webgpu:environment",
+#         "//litert/c/internal:litert_runtime_context",
 #         "//litert/c/internal:litert_tensor_buffer_registry",
 #         "//litert/cc:litert_any",
 #         "//litert/cc:litert_layout",
