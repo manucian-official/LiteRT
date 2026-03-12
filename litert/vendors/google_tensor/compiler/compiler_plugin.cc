@@ -34,6 +34,7 @@
 #include "litert/c/litert_common.h"
 #include "litert/c/litert_model.h"
 #include "litert/c/litert_op_code.h"
+#include "litert/c/litert_op_options.h"
 #include "litert/cc/internal/litert_extended_model.h"
 #include "litert/cc/litert_buffer_ref.h"
 #include "litert/cc/litert_macros.h"
@@ -135,7 +136,9 @@ constexpr LiteRtOpCode kUnSupportedOps[] = {
     kLiteRtOpCodeShloScatter,
     kLiteRtOpCodeShloWindow,
 };
-// clang format on
+
+constexpr const char* kSupportedStableHloCompositeOps[] = {
+    "odml.rms_norm", "odml.group_norm", "odml.scaled_dot_product_attention"};
 
 constexpr auto kNumPluginSocModels =
     sizeof(kPluginSocModels) / sizeof(kPluginSocModels[0]);
@@ -462,6 +465,26 @@ bool IsOpSupported(const litert::Op& op) {
   return true;
 }
 
+bool IsShloCompositeSupported(const litert::Op& op) {
+  if (op.Code() == kLiteRtOpCodeShloComposite) {
+    const char* custom_op_name = nullptr;
+    if (LiteRtGetSHLOCompositeOpName(op.Get(), &custom_op_name) !=
+            kLiteRtStatusOk ||
+        custom_op_name == nullptr) {
+      return false;
+    }
+    // check if the name of the composite op is in the list of
+    // kSupportedStableHloCompositeOps.
+    for (auto supported_op : kSupportedStableHloCompositeOps) {
+      if (strcmp(supported_op, custom_op_name) == 0) {
+        return true;
+      }
+    }
+    LITERT_LOG(LITERT_INFO, "unsupported composite op: %s", custom_op_name);
+  }
+  return false;
+}
+
 }  // namespace google_tensor
 
 LiteRtStatus LiteRtCompilerPluginPartition(LiteRtCompilerPlugin compiler_plugin,
@@ -472,6 +495,11 @@ LiteRtStatus LiteRtCompilerPluginPartition(LiteRtCompilerPlugin compiler_plugin,
   for (const auto& op : graph.Ops()) {
     if (!google_tensor::IsOpSupported(op)) {
       continue;
+    }
+    if (op.Code() == kLiteRtOpCodeShloComposite) {
+      if (!google_tensor::IsShloCompositeSupported(op)) {
+        continue;
+      }
     }
 
     LITERT_RETURN_IF_ERROR(LiteRtPushOp(selected_ops, op.Get(), 0));
